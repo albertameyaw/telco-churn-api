@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.claude/
+
+# Raw dataset is large-ish and freely re-downloadable (see README) -
+# no need to version it. The trained model artifact IS committed on
+# purpose so graders can run the API without retraining first.
+data/*.csv

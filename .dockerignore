@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+data/
+tests/
+requirements-dev.txt
+README.md
+MONITORING.md

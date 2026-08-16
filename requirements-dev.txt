@@ -1,0 +1,6 @@
+# Testing-only dependencies. Kept separate from requirements.txt so the
+# Docker image we deploy to Render doesn't carry test tooling it never
+# needs at runtime - smaller image, smaller attack surface.
+-r requirements.txt
+pytest==8.3.4
+httpx==0.28.1
