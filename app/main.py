@@ -17,13 +17,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Loaded once at process startup, not per-request. joblib.load deserializes
-# the entire fitted Pipeline - preprocessor and model together - so a
-# single object is enough to go from raw customer fields to a prediction.
-# If the file is missing (e.g. someone forgot to run training before
-# starting the API), we keep the app alive but report it via /health
-# rather than crashing on import - that makes the failure diagnosable
-# instead of just "the container won't start."
+# Loaded once at process startup rather than per-request. If the artifact
+# is missing, keep the app alive and report it via /health instead of
+# crashing on import.
 try:
     model = joblib.load(MODEL_PATH)
 except FileNotFoundError:
@@ -32,12 +28,7 @@ except FileNotFoundError:
 
 @app.get("/health", response_model=HealthResponse)
 def health():
-    """
-    Liveness/readiness check. Render (and any orchestrator) polls this to
-    know whether the container is ready to receive traffic. Reporting
-    model_loaded separately from a 200 status lets you tell "the process
-    is up" apart from "the process is up but has no model to serve."
-    """
+    """Liveness/readiness check, polled by Render and any orchestrator."""
     return HealthResponse(status="ok", model_loaded=model is not None)
 
 
@@ -49,11 +40,7 @@ def predict(request: ChurnPredictionRequest):
             detail="Model not loaded. Run training first to produce models/model.joblib.",
         )
 
-    # The pipeline was fit on a DataFrame with these exact column names,
-    # so prediction input needs the same shape: a one-row DataFrame, not
-    # a plain dict. This is where ColumnTransformer earns its keep - we
-    # hand it the raw request fields untouched and it applies the exact
-    # same imputation/scaling/encoding that training used.
+    # Pipeline was fit on a DataFrame with these exact column names.
     input_df = pd.DataFrame([request.model_dump()])[ALL_FEATURES]
 
     prediction = model.predict(input_df)[0]

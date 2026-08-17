@@ -1,9 +1,6 @@
 """
-Smoke tests for the API using FastAPI's TestClient (which wraps httpx and
-doesn't need a running server - it calls the app in-process). These aren't
-exhaustive; they exist to catch "the whole thing is broken" before you
-deploy, e.g. a schema field that no longer matches the pipeline's expected
-columns.
+Smoke tests for the API using FastAPI's TestClient (in-process, no server
+needed).
 
 Run with:  pytest
 Requires models/model.joblib to already exist (run `python -m src.train` first).
@@ -55,10 +52,7 @@ def test_predict_returns_valid_shape():
 
 
 def test_predict_rejects_unknown_category():
-    """
-    Literal-typed fields should reject values outside the training
-    vocabulary (e.g. a typo) with a 422, not silently pass it through.
-    """
+    """Values outside the training vocabulary should be rejected with a 422."""
     bad_payload = dict(VALID_PAYLOAD)
     bad_payload["InternetService"] = "Satellite"
     response = client.post("/predict", json=bad_payload)

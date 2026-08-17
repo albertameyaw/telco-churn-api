@@ -22,21 +22,10 @@ from src.pipeline import build_logistic_regression_pipeline, build_xgboost_pipel
 
 def evaluate(name: str, pipeline, X_test, y_test) -> dict:
     """
-    Computes all five required metrics. Why not just accuracy: churn is
-    imbalanced (roughly 73% "no churn" / 27% "churn" in this dataset), so
-    a model that always predicts "no churn" would score ~73% accuracy
-    while being useless. Precision/recall/F1/ROC-AUC each surface that
-    failure mode differently:
-      - recall: of actual churners, how many did we catch? (misses here
-        are the costly kind for a retention team)
-      - precision: of everyone we flagged as a churn risk, how many
-        really were? (misses here waste retention-offer budget)
-      - F1: harmonic mean of the two, one number that punishes ignoring
-        either
-      - ROC-AUC: how well the model ranks churners above non-churners
-        across ALL possible decision thresholds, not just 0.5 - useful
-        because the "right" threshold is a business decision, not a
-        modeling one
+    Accuracy alone is misleading on this ~73/27 imbalanced label - a
+    model that always predicts "no churn" would score ~73% while being
+    useless. Precision/recall/F1/ROC-AUC are reported alongside it to
+    surface that failure mode.
     """
     y_pred = pipeline.predict(X_test)
     y_proba = pipeline.predict_proba(X_test)[:, 1]
@@ -61,9 +50,7 @@ def main():
     X = df[ALL_FEATURES]
     y = df[TARGET_COLUMN]
 
-    # stratify=y keeps the 73/27 class ratio consistent between train and
-    # test splits - without it, an unlucky random split could leave the
-    # test set with a noticeably different churn rate than training saw.
+    # stratify=y keeps the churn ratio consistent across train/test splits.
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=y
     )
@@ -76,11 +63,8 @@ def main():
         "Logistic Regression", lr_pipeline, X_test, y_test
     ))
 
-    # scale_pos_weight tells XGBoost how much more to penalize missing a
-    # churner vs. a false alarm. The standard formula is
-    # (count of majority class) / (count of minority class), computed
-    # from the TRAINING split only - using test data here would leak
-    # information the model shouldn't have at fit time.
+    # majority/minority ratio, computed from the training split only to
+    # avoid leaking test-set information into a fit-time parameter.
     scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
     xgb_pipeline = build_xgboost_pipeline()
     xgb_pipeline.set_params(classifier__scale_pos_weight=scale_pos_weight)
@@ -89,9 +73,8 @@ def main():
         "XGBoost", xgb_pipeline, X_test, y_test
     ))
 
-    # Pick the winner by ROC-AUC: it's threshold-independent, so it
-    # reflects overall model quality rather than how lucky the default
-    # 0.5 cutoff happened to be for one model over the other.
+    # ROC-AUC is threshold-independent, so it's used as the selection
+    # criterion rather than accuracy at the default 0.5 cutoff.
     best_name, (best_pipeline, best_metrics) = max(
         results.items(), key=lambda item: item[1][1]["roc_auc"]
     )
